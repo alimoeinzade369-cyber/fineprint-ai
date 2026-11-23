@@ -21,7 +21,7 @@ type AnalysisResult = {
   credits_remaining: number;
 };
 
-type ApiError = {
+type ApiError = Record<string, unknown> & {
   error?: string;
   details?: string;
 };
