@@ -18,7 +18,6 @@ type AnalysisResult = {
   summary: string;
   red_flags: string[];
   advice: string[];
-  credits_remaining: number;
 };
 
 type ApiError = Record<string, unknown> & {
@@ -37,7 +36,6 @@ function isApiError(value: unknown): value is ApiError {
 
 export default function Dashboard() {
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [credits, setCredits] = useState<number>(0);
   const [scans, setScans] = useState<Scan[]>([]);
   const [text, setText] = useState<string>("");
   const [file, setFile] = useState<File | null>(null);
@@ -54,18 +52,6 @@ export default function Dashboard() {
       return;
     }
     setUser({ id: currentUser.id, email: currentUser.email ?? undefined });
-
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("credits")
-      .eq("id", currentUser.id)
-      .single();
-
-    if (profileError && profileError.code !== "PGRST116") {
-      setError(profileError.message);
-      return;
-    }
-    setCredits(typeof profile?.credits === "number" ? profile.credits : 0);
 
     const { data, error: scansError } = await supabase
       .from("scans")
@@ -122,8 +108,7 @@ export default function Dashboard() {
         || typeof payload.risk_score !== "number"
         || typeof payload.summary !== "string"
         || !Array.isArray(payload.red_flags)
-        || !Array.isArray(payload.advice)
-        || typeof payload.credits_remaining !== "number") {
+        || !Array.isArray(payload.advice)) {
         setError("The server returned an unexpected analysis response.");
         return;
       }
@@ -133,10 +118,8 @@ export default function Dashboard() {
         summary: payload.summary,
         red_flags: payload.red_flags.filter((item): item is string => typeof item === "string"),
         advice: payload.advice.filter((item): item is string => typeof item === "string"),
-        credits_remaining: payload.credits_remaining,
       };
       setResult(analysis);
-      setCredits(analysis.credits_remaining);
       setText("");
       setFile(null);
       await load();
@@ -166,10 +149,6 @@ export default function Dashboard() {
             <h1 className="mt-2 text-3xl font-extrabold">Document analysis</h1>
             <p className="mt-2 text-slate-500">Understand the risks before you sign.</p>
           </div>
-          <div className="rounded-2xl border bg-white px-5 py-3">
-            <div className="text-xs text-slate-500">Available credits</div>
-            <div className="text-2xl font-bold">{credits}</div>
-          </div>
         </div>
 
         <div className="mt-8 grid gap-7 lg:grid-cols-[1.2fr_.8fr]">
@@ -183,8 +162,8 @@ export default function Dashboard() {
                 <input type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt" className="hidden" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
               </label>
               {error && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-              <button disabled={busy || credits < 1} className="w-full rounded-xl bg-brand p-3 font-semibold text-white disabled:opacity-50">
-                {busy ? "Analyzing document…" : credits < 1 ? "No credits remaining" : "Analyze document · 1 credit"}
+              <button disabled={busy} className="w-full rounded-xl bg-brand p-3 font-semibold text-white disabled:opacity-50">
+                {busy ? "Analyzing document…" : "Analyze document"}
               </button>
             </form>
           </section>
