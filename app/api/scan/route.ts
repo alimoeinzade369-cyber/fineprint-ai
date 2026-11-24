@@ -279,22 +279,6 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     const db = createAdminClient();
-    const { data: profile, error: profileError } = await db
-      .from("profiles")
-      .select("credits")
-      .eq("id", user.id)
-      .single();
-
-    if (profileError) {
-      throw new Error(`Supabase profile lookup failed: ${profileError.message}`);
-    }
-    if (!profile || typeof profile.credits !== "number" || profile.credits < 1) {
-      return NextResponse.json(
-        { error: "You have no credits remaining." },
-        { status: 402 }
-      );
-    }
-
     const rawText = await requestOpenRouter(openRouterApiKey, content);
     let decoded: unknown;
     try {
@@ -303,25 +287,6 @@ export async function POST(request: Request): Promise<NextResponse> {
       throw new Error("OpenRouter returned invalid JSON.");
     }
     const analysis = parseAnalysis(decoded);
-
-    const { data: updated, error: creditError } = await db
-      .from("profiles")
-      .update({ credits: profile.credits - 1 })
-      .eq("id", user.id)
-      .eq("credits", profile.credits)
-      .select("credits")
-      .single();
-
-    if (creditError || !updated) {
-      console.error("Supabase credit update error:", creditError);
-      return NextResponse.json(
-        {
-          error: "Could not update credits.",
-          details: creditError?.message ?? "Credit balance changed; please try again.",
-        },
-        { status: 409 }
-      );
-    }
 
     const { error: saveError } = await db.from("scans").insert({
       user_id: user.id,
@@ -338,13 +303,12 @@ export async function POST(request: Request): Promise<NextResponse> {
         {
           error: "Analysis completed, but saving the scan failed.",
           details: saveError.message,
-          credits_remaining: updated.credits,
         },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({ ...analysis, credits_remaining: updated.credits });
+    return NextResponse.json(analysis);
   } catch (error: unknown) {
     const message = getErrorMessage(error);
     console.error("POST /api/scan failed:", error);
