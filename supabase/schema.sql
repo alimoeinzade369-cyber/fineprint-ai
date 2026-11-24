@@ -4,6 +4,11 @@ create table if not exists public.profiles (
  credits integer not null default 5 check (credits >= 0),
  created_at timestamptz not null default now()
 );
+-- Ensure existing projects also have the canonical credit column.
+-- The application reads and writes public.profiles.credits.
+alter table public.profiles
+ add column if not exists credits integer not null default 5;
+
 create table if not exists public.scans (
  id uuid primary key default gen_random_uuid(),
  user_id uuid not null references auth.users(id) on delete cascade,
